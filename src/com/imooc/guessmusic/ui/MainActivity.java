@@ -3,11 +3,14 @@ package com.imooc.guessmusic.ui;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.Random;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import android.app.Activity;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.provider.UserDictionary.Words;
+import android.text.format.Time;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.animation.Animation;
@@ -27,9 +30,22 @@ import com.imooc.guessmusic.model.IWordButtonClickListener;
 import com.imooc.guessmusic.model.Song;
 import com.imooc.guessmusic.model.WordButton;
 import com.imooc.guessmusic.myui.MyGridView;
+import com.imooc.guessmusic.util.MyLog;
 import com.imooc.guessmusic.util.Util;
 
 public class MainActivity extends Activity implements IWordButtonClickListener {
+
+	public final static String TAG = "MainActivity";
+	/** 答案的状态 正确 */
+	public final static int STATUS_ANSWER_RIGHT = 1;
+	/** 答案的状态 错误 */
+	public final static int STATUS_ANSWER_WRONG = 2;
+	/** 答案的状态 不完整 */
+	public final static int STATUS_ANSWER_LACK = 3;
+
+	// 闪烁的次数
+	public final static int SPASH_TIMES = 6;
+
 	private Animation mPanAnim;
 	private LinearInterpolator mPanLin;
 
@@ -42,9 +58,8 @@ public class MainActivity extends Activity implements IWordButtonClickListener {
 	private ImageView mViewPan;
 	private ImageView mViewPanbar;
 
-	private ImageButton mBtnPlayStart;
-
 	private boolean mIsRunning = false;
+	private ImageButton mBtnPlayStart;
 	// 文字框容器
 	private ArrayList<WordButton> mAllWords;
 
@@ -162,11 +177,12 @@ public class MainActivity extends Activity implements IWordButtonClickListener {
 		wordButton.mViewButton.setText("");
 		wordButton.mWordString = "";
 		wordButton.mIsVisiable = false;
-		
+//		wordButton.mViewButton.setTextColor(Color.WHITE);
 		// 设置待选框可见性
 		setButtonVisiable(mAllWords.get(wordButton.mIndex), View.VISIBLE);
 
 	}
+
 	@Override
 	public void onWordButtonClick(WordButton wordButton) {
 
@@ -175,6 +191,16 @@ public class MainActivity extends Activity implements IWordButtonClickListener {
 		// Toast.LENGTH_SHORT).show();
 		setSelectWord(wordButton);
 
+		int checkResult = checkTheAnswer();
+		if (checkResult == STATUS_ANSWER_RIGHT) {
+
+		} else if (checkResult == STATUS_ANSWER_WRONG) {
+			sparkTheWrods();
+		} else if (checkResult == STATUS_ANSWER_LACK) {
+			for (int i = 0; i < mBtnSelectWords.size(); i++) {
+				mBtnSelectWords.get(i).mViewButton.setTextColor(Color.WHITE);
+			}
+		}
 	}
 
 	private void setSelectWord(WordButton wordButton) {
@@ -187,16 +213,21 @@ public class MainActivity extends Activity implements IWordButtonClickListener {
 				mBtnSelectWords.get(i).mWordString = wordButton.mWordString;
 				mBtnSelectWords.get(i).mIndex = wordButton.mIndex;
 
+				MyLog.d(TAG, mBtnSelectWords.get(i).mIndex + "");
+
 				setButtonVisiable(wordButton, View.INVISIBLE);
+
 				break;
 			}
-			
+
 		}
 	}
 
 	private void setButtonVisiable(WordButton button, int visibility) {
 		button.mViewButton.setVisibility(visibility);
 		button.mIsVisiable = (visibility == View.VISIBLE) ? true : false;
+
+		MyLog.d(TAG, button.mIsVisiable + "");
 	}
 
 	private void handlePlayButton() {
@@ -270,7 +301,7 @@ public class MainActivity extends Activity implements IWordButtonClickListener {
 
 			holder.mViewButton.setBackgroundResource(R.drawable.game_wordblank);
 			holder.mViewButton.setOnClickListener(new View.OnClickListener() {
-				
+
 				@Override
 				public void onClick(View v) {
 					clearTheAnswer(holder);
@@ -335,5 +366,53 @@ public class MainActivity extends Activity implements IWordButtonClickListener {
 			e.printStackTrace();
 		}
 		return str.charAt(0);
+	}
+
+	private int checkTheAnswer() {
+
+		for (int i = 0; i < mBtnSelectWords.size(); i++) {
+			if (mBtnSelectWords.get(i).mWordString.length() == 0) {
+				return STATUS_ANSWER_LACK;
+			}
+
+		}
+		StringBuffer sb = new StringBuffer();
+		for (int i = 0; i < mBtnSelectWords.size(); i++) {
+			sb.append(mBtnSelectWords.get(i).mWordString);
+		}
+		return (sb.toString().equals(mCurrentSong.getSongName())) ? STATUS_ANSWER_RIGHT
+				: STATUS_ANSWER_WRONG;
+
+	}
+
+	/**
+	 * 
+	 * 文字闪烁
+	 * 
+	 */
+	private void sparkTheWrods() {
+		TimerTask task = new TimerTask() {
+			boolean mChange = false;
+			int mSpeadTimes = 0;
+
+			public void run() {
+				runOnUiThread(new Runnable() {
+					public void run() {
+						if (++mSpeadTimes > SPASH_TIMES) {
+							return;
+						}
+						// 执行闪烁逻辑
+						for (int i = 0; i < mBtnSelectWords.size(); i++) {
+							mBtnSelectWords.get(i).mViewButton
+									.setTextColor(mChange ? Color.RED
+											: Color.WHITE);
+						}
+						mChange = !mChange;
+					}
+				});
+			}
+		};
+		Timer timer = new Timer();
+		timer.schedule(task, 1, 150);
 	}
 }
